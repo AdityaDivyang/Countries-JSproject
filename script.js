@@ -23,10 +23,12 @@ const renderCountry = function (data, className = '') {
             </article>
         `;
 	countriesContainer.insertAdjacentHTML('beforeend', html);
+	countriesContainer.style.opacity = 1;
 };
 
 const renderError = function (msg) {
 	countriesContainer.insertAdjacentText('beforeend', msg);
+	countriesContainer.style.opacity = 1;
 };
 ///////////////////////////////////////
 // const getCountryData = function (country) {
@@ -109,41 +111,116 @@ const renderError = function (msg) {
 // );
 // console.log(request);
 
-const getJSON = function (url, errorMSG) {
-	return fetch(url).then(response => {
-		if (!response.ok) throw new Error(`${errorMSG} (${response.status})`);
-		return response.json();
+// const getJSON = function (url, errorMSG) {
+// 	return fetch(url).then(response => {
+// 		if (!response.ok) throw new Error(`${errorMSG} (${response.status})`);
+// 		return response.json();
+// 	});
+// };
+
+// const getCountryData = function (country) {
+// 	// AJAX call country 1
+// 	getJSON(
+// 		`https://restcountries.eu/rest/v2/name/${country}?fullText=true`,
+// 		'Country not found'
+// 	)
+// 		.then(data => {
+// 			renderCountry(data[0]);
+// 			const neighbour = data[0].borders[0];
+// 			if (!neighbour) throw new Error('No neighbour found!');
+
+// 			// Country 2
+// 			return getJSON(
+// 				`https://restcountries.eu/rest/v2/alpha/${neighbour}`,
+// 				'Country not found'
+// 			);
+// 		})
+// 		.then(data => renderCountry(data, 'neighbour'))
+// 		.catch(err => {
+// 			console.error(`${err} is the error`);
+// 			renderError(`Something went wrong : ${err.message}`);
+// 		})
+// 		.finally(() => {
+// 			countriesContainer.style.opacity = 1;
+// 		});
+// };
+
+// btn.addEventListener('click', function () {
+// 	getCountryData('india');
+// 	btn.style.display = 'none';
+// });
+
+const getPosition = function () {
+	return new Promise(function (resolve, reject) {
+		navigator.geolocation.getCurrentPosition(resolve, reject);
 	});
 };
 
-const getCountryData = function (country) {
-	// AJAX call country 1
-	getJSON(
-		`https://restcountries.eu/rest/v2/name/${country}?fullText=true`,
-		'Country not found'
-	)
-		.then(data => {
-			renderCountry(data[0]);
-			const neighbour = data[0].borders[0];
-			if (!neighbour) throw new Error('No neighbour found!');
+const whereAmI = async function () {
+	try {
+		// Geolocation : getting coordinates
+		const {
+			coords: { latitude: lat, longitude: lng },
+		} = await getPosition();
 
-			// Country 2
-			return getJSON(
-				`https://restcountries.eu/rest/v2/alpha/${neighbour}`,
-				'Country not found'
-			);
-		})
-		.then(data => renderCountry(data, 'neighbour'))
-		.catch(err => {
-			console.error(`${err} is the error`);
-			renderError(`Something went wrong : ${err.message}`);
-		})
-		.finally(() => {
-			countriesContainer.style.opacity = 1;
-		});
+		// Reverse Geocoding
+		const resGeo = await fetch(
+			`https://geocode.xyz/${lat},${lng}?geoit=json`
+		);
+		if (!resGeo.ok)
+			throw new Error(`Problem getting location data : ${resGeo.status}`);
+		const dataGeo = await resGeo.json();
+
+		// Country data
+		const res = await fetch(
+			`https://restcountries.eu/rest/v2/name/${dataGeo.country}?fullText=true`
+		);
+		if (!res.ok)
+			throw new Error(`Problem getting country data : ${res.status}`);
+		const [data] = await res.json();
+
+		// Rendering Country
+		renderCountry(data);
+		return `You are in ${dataGeo.city} ${dataGeo.country}`;
+	} catch (err) {
+		console.log(`An error ocurred: ${err}`);
+		renderError(`Something went wrong : ${err.message}`);
+		throw err;
+	}
 };
+// whereAmI()
+// 	.then(data => console.log(data))
+// 	.catch(err => console.error(err));
+(async function () {
+	try {
+		const data = await whereAmI();
+		console.log(data);
+	} catch (err) {
+		console.error(err);
+	}
+})();
+console.log('First');
 
-btn.addEventListener('click', function () {
-	getCountryData('india');
-	btn.style.display = 'none';
-});
+// (async function () {
+// 	const [res] = await Promise.race([
+// 		getJSON(`https://restcountries.eu/rest/v2/name/italy?fullText=true`),
+// 		getJSON(`https://restcountries.eu/rest/v2/name/egypt?fullText=true`),
+// 		getJSON(`https://restcountries.eu/rest/v2/name/mexico?fullText=true`),
+// 	]);
+// 	console.log(res);
+// })();
+
+// const timeout = function (s) {
+// 	return new Promise(function (_, reject) {
+// 		setTimeout(function () {
+// 			reject(new Error('Request took too long!'));
+// 		}, s * 1000);
+// 	});
+// };
+
+// Promise.race([
+// 	getJSON(`https://restcountries.eu/rest/v2/name/italy?fullText=true`),
+// 	timeout(1),
+// ])
+// 	.then(res => console.log(res[0]))
+// 	.catch(err => console.error(err));
